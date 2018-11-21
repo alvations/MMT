@@ -17,6 +17,7 @@ from tensor2tensor.utils import registry, optimize
 import t2t  # pylint: disable=unused-import
 from nmmt import Translation, TranslationRequest, TranslationResponse
 
+from tensorflow.python.client import timeline
 
 class ModelConfig(object):
     __custom_values = {'True': True, 'False': False, 'None': None}
@@ -96,6 +97,9 @@ class TransformerDecoder(object):
         self._checkpoints = checkpoints
         self._checkpoint = None
         self._nn_needs_reset = True
+
+        self._run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        self._run_metadata = tf.RunMetadata()
 
         with tf.device('/device:GPU:0' if gpu is not None else '/cpu:0'):
             self._restorer = checkpoints.restorer()
@@ -247,7 +251,14 @@ class TransformerDecoder(object):
             predictions_op = self._get_predictions_op(source_lang, target_lang, len(inputs))
             results = self._session.run(predictions_op, {
                 self._ph_infer_inputs: inputs
-            })
+            }, options=self._run_options, run_metadata=self._run_metadata)
+
+            # Create the Timeline object, and write it to a json
+            tl = timeline.Timeline(self._run_metadata.step_stats)
+            ctf = tl.generate_chrome_trace_format()
+            with open('timeline.json', 'w+') as f:
+                f.write(ctf)
+
             outputs = self._save_until_eos(results['outputs'])
             raw_output, output_indexes = self._text_decode(outputs)
         else:
@@ -389,8 +400,9 @@ class TransformerDecoder(object):
 
                 response = TranslationResponse.to_json_string(translation)
 
-                stdout.write(response + '\n')
+                stdout.write("ZZZ" + response + '\n')
                 stdout.flush()
+
         except KeyboardInterrupt:
             pass  # ignore and exit
         except BaseException as e:
