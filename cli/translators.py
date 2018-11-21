@@ -14,6 +14,12 @@ from cli.libs import nvidia_smi
 from cli.mmt.cluster import ApiException, ClusterNode
 from cli.mmt.processing import XMLEncoder
 
+def  map_language(lang):
+    fields = lang.split('-')
+    if fields[0] == "zh" and len(fields) > 1:
+        if fields[1] == "CN" or fields[1] == "TW":
+            return lang
+    return fields[0]
 
 class TranslateError(Exception):
     def __init__(self, *args, **kwargs):
@@ -238,8 +244,8 @@ class GoogleTranslate(TranslateEngine):
     def translate_text(self, text):
         data = {
             'model': 'nmt',
-            'source': self.source_lang,
-            'target': self.target_lang,
+            'source': map_language(self.source_lang),
+            'target': map_language(self.target_lang),
             'q': text,
             'key': self._key,
             'userip': '.'.join(map(str, (random.randint(0, 200) for _ in range(4))))
